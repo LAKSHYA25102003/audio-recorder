@@ -1,87 +1,67 @@
-function App() {
+import React, { useState, useEffect } from 'react';
 
+function App () {
+  const [recording, setRecording] = useState(false);
+  const [audioStream, setAudioStream] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
 
-  let audioRecorder = {
-    audioBlobs: [],
-    mediaRecorder: null,
-    streamBeingCaptured: null,
+  const handleStartRecording = () => {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then((stream) => {
+        const mediaRecorder = new MediaRecorder(stream);
 
-    start: () => {
-      if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
-        return Promise.reject(new Error('mediaDevices API or getUserMedia method is not supported in this browser.'));
-      }
-      else {
-        return navigator.mediaDevices.getUserMedia({ audio: true })
-          .then(stream => {
-            audioRecorder.streamBeingCaptured = stream;
+        mediaRecorder.addEventListener('dataavailable', (event) => {
+          setAudioChunks((chunks) => [...chunks, event.data]);
+        });
 
+        mediaRecorder.addEventListener('stop', () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/mpeg-3' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          audio.play();
 
-            audioRecorder.mediaRecorder = new MediaRecorder(stream);
+          setAudioStream(null);
+          setAudioChunks([]);
+          setRecording(false);
 
+          const link = document.createElement('a');
+          link.href = audioUrl;
+          link.download = 'recording.mp3';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
 
-            audioRecorder.audioBlobs = [];
+        mediaRecorder.start();
 
-
-            audioRecorder.mediaRecorder.addEventListener("dataavailable", event => {
-
-              audioRecorder.audioBlobs.push(event.data);
-            });
-
-
-            audioRecorder.mediaRecorder.start();
-          });
-      }
-    },
-    
-    
-  }
-
-  const startAudioRecording = () => {
-    audioRecorder.start()
-      .then(() => {
-        console.log("Recording Audio...")
+        setRecording(true);
+        setAudioStream(stream);
       })
-      .catch(error => {
-        if (error.message.includes("mediaDevices API or getUserMedia method is not supported in this browser.")) {
-          console.log("To record audio, use browsers like Chrome and Firefox.");
-          
-          switch (error.name) {
-            case 'AbortError': //error from navigator.mediaDevices.getUserMedia
-              console.log("An AbortError has occured.");
-              break;
-            case 'NotAllowedError': //error from navigator.mediaDevices.getUserMedia
-              console.log("A NotAllowedError has occured. User might have denied permission.");
-              break;
-            case 'NotFoundError': //error from navigator.mediaDevices.getUserMedia
-              console.log("A NotFoundError has occured.");
-              break;
-            case 'NotReadableError': //error from navigator.mediaDevices.getUserMedia
-              console.log("A NotReadableError has occured.");
-              break;
-            case 'SecurityError': //error from navigator.mediaDevices.getUserMedia or from the MediaRecorder.start
-              console.log("A SecurityError has occured.");
-              break;
-            case 'TypeError': //error from navigator.mediaDevices.getUserMedia
-              console.log("A TypeError has occured.");
-              break;
-            case 'InvalidStateError': //error from the MediaRecorder.start
-              console.log("An InvalidStateError has occured.");
-              break;
-            case 'UnknownError': //error from the MediaRecorder.start
-              console.log("An UnknownError has occured.");
-              break;
-            default:
-              console.log("An error occured with the error name " + error.name);
-          };
-        };
-      });
-  }
+      .catch((error) => console.error(error));
+  };
+
+  const handleStopRecording = () => {
+    if (audioStream) {
+      audioStream.getTracks().forEach((track) => track.stop());
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      handleStopRecording();
+    };
+  }, []);
 
   return (
-    <div className="App text-center text-[24px] font-bold p-[10px]">
-      lakshya
+    <div>
+      {recording ? (
+        <button className='border-[2px] rounded-md bg-red-400 text-white border-red-400' onClick={handleStopRecording}>Stop Recording</button>
+      ) : (
+        <button className='border-[2px] rounded-md bg-red-400 text-white border-red-400' onClick={handleStartRecording}>Start Recording</button>
+      )}
     </div>
   );
-}
+};
 
 export default App;
+
